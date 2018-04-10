@@ -1,0 +1,92 @@
+from bs4 import BeautifulSoup
+import os
+from datetime import datetime
+import re
+import ast
+
+#convert bytes into bs object
+#inspect and find the tags
+#when going over folders, path should be end with '/'
+
+outer_d = {}
+PATH = '/Users/yusheng/pythonpractice/project_two/2017W2/'
+for folder in sorted(os.listdir(PATH)):
+    try:
+        for html in sorted(os.listdir(PATH + folder)):
+            inner_d = {}
+            if 'ios' in html:
+                with open(os.path.join('/Users/yusheng/pythonpractice/project_two/2017W2/', folder, html),'r') as ios:
+                    soup_ios = BeautifulSoup(ios, 'html.parser')
+                    dt = datetime.strptime(folder+html[0:5],'%Y-%m-%d%H_%M')
+                    try:
+                        inner_d['ios_current_ratings'] = ast.literal_eval(soup_ios.find('span',attrs={'class':'rating-count','itemprop':'reviewCount'}).string.strip('Ratings').strip())
+                        inner_d['ios_all_ratings'] = ast.literal_eval(soup_ios.find('span',attrs={'class':'rating-count','itemprop':''}).string.strip('Ratings').strip())
+                        inner_d['ios_file_size'] = ast.literal_eval(soup_ios.find(string=re.compile('MB')).string.strip('MB').strip())
+                        if dt not in outer_d:
+                            outer_d[dt] = inner_d
+                        else:
+                            outer_d[dt].update(inner_d)
+                    except AttributeError:
+                        continue
+            else:
+                with open(os.path.join('/Users/yusheng/pythonpractice/project_two/2017W2/', folder, html),'r') as android:
+                    soup_android = BeautifulSoup(android, 'html.parser')
+                    dt = datetime.strptime(folder+html[0:5],'%Y-%m-%d%H_%M')
+                    try:
+                        inner_d['android_avg_rating'] = ast.literal_eval(soup_android.find('div',attrs={'class':'score'}).string.strip())
+                        inner_d['android_total_ratings'] = ast.literal_eval(soup_android.find('span',attrs={'class':'reviews-num'}).string.strip().replace(',',''))
+                        inner_d['android_ratings_1'] = ast.literal_eval(soup_android.find_all('span',attrs={'class':'bar-number'})[4].string.strip().replace(',',''))
+                        inner_d['android_ratings_2'] = ast.literal_eval(soup_android.find_all('span',attrs={'class':'bar-number'})[3].string.strip().replace(',',''))
+                        inner_d['android_ratings_3'] = ast.literal_eval(soup_android.find_all('span',attrs={'class':'bar-number'})[2].string.strip().replace(',',''))
+                        inner_d['android_ratings_4'] = ast.literal_eval(soup_android.find_all('span',attrs={'class':'bar-number'})[1].string.strip().replace(',',''))
+                        inner_d['android_ratings_5'] = ast.literal_eval(soup_android.find_all('span',attrs={'class':'bar-number'})[0].string.strip().replace(',',''))
+                        str_of_file_size = soup_android.find('div',attrs={'class':'content','itemprop':'fileSize'}).string.strip()
+                        inner_d['android_file_size'] = ast.literal_eval(str_of_file_size[0:len(str_of_file_size)-1].strip())
+                        if dt not in outer_d:
+                            outer_d[dt] = inner_d
+                        else:
+                            outer_d[dt].update(inner_d)
+                    except AttributeError:
+                        continue
+    except NotADirectoryError:
+        continue
+            
+import pandas as pd
+df = pd.DataFrame(outer_d)
+df = df.transpose()
+df.to_json('data.json')
+df.to_excel('data.xlsx')
+df.to_csv('data.csv')  
+
+#describe the dataframe object to gain mean,medium,std,etc..
+
+df.describe() 
+
+#drop NaN before checking the correlation
+#set inplace=True, so you can modify the original df instead of working on a copy
+
+df.dropna(how='any',inplace=True)
+
+from pandas.plotting import scatter_matrix
+import matplotlib.pyplot as plt
+
+#visualization with scatter_matrix
+
+scatter_matrix(df, figsize=(20,20))
+plt.savefig('pandas_scatter_matrix_larger_figsize.pdf')
+plt.show()  
+
+#visualization with heat map
+import seaborn as sns
+corr = df.corr()
+sns.heatmap(corr,
+            xticklabels=corr.columns.values,
+            yticklabels=corr.columns.values,
+            linewidths=.5
+            )
+plt.savefig('sns_heatmap.pdf')
+plt.show()
+
+
+
+            
